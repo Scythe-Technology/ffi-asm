@@ -35,7 +35,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
         .optimize = optimize,
-        .test_runner = b.path("runner.zig"),
+        .test_runner = .{
+            .mode = .simple,
+            .path = b.path("runner.zig"),
+        },
         .filters = b.args orelse &.{},
     });
 
