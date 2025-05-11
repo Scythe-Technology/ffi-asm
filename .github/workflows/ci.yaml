@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Zig
+      uses: mlugg/setup-zig@v1
+      with:
+        version: 0.14.0
+        use-cache: false
+
+    - name: Run fmt
+      run: zig fmt --check **/*.zig
+
+  test:
+    needs: [fmt]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x86_64
+            target: x86_64-linux-gnu
+          - os: windows-latest
+            name: Windows x86_64
+            target: x86_64-windows
+            ext: .exe
+          - os: macos-13
+            name: macOs x86_64
+            target: x86_64-macos
+          # Enable when Arm64 is supported
+          # - os: macos-14
+          #   name: macOs Arm64
+          #   target: aarch64-macos
+          #   artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
+          # - os: ubuntu-22.04-arm
+          #   name: Linux Arm64
+          #   target: aarch64-linux
+          # Enable when Risc-v64 is supported
+          # - os: ubuntu-latest
+          #   name: Linux Risc-v64
+          #   target: riscv64-linux
+          #   qemu-platform: riscv64
+
+    name: ${{ matrix.name }}
+    timeout-minutes: 20
+    runs-on: ${{matrix.os}}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Zig
+      uses: mlugg/setup-zig@v1
+      with:
+        version: 0.14.0
+        use-cache: false
+
+    - name: Setup QEMU
+      if: matrix.qemu-platform != ''
+      uses: docker/setup-qemu-action@v1
+
+    - name: Run tests
+      continue-on-error: ${{ matrix.qemu-platform != '' }}
+      run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
+

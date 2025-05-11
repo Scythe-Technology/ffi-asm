@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const DEBUG = true;
+const build_cfg = @import("build_cfg");
 
 const Conventions = enum {
     Windows,
@@ -85,6 +85,58 @@ const AssemblyBuilder = struct {
         xmm14,
         xmm15,
         SIB,
+
+        pub fn withBitSize(self: Register, bit_size: u8) Register {
+            if (@intFromEnum(self) >= @intFromEnum(@as(Register, .r8)))
+                return self;
+            return switch (bit_size) {
+                2 => switch (self) {
+                    .ax, .cx, .dx, .bx, .sp, .bp, .si, .di => self,
+                    .eax, .ecx, .edx, .ebx, .esp, .ebp, .esi, .edi => @enumFromInt(@intFromEnum(self) - @intFromEnum(@as(Register, .eax))),
+                    .rax, .rcx, .rdx, .rbx, .rsp, .rbp, .rsi, .rdi => @enumFromInt(@intFromEnum(self) - @intFromEnum(@as(Register, .rax))),
+                    else => unreachable,
+                },
+                4 => switch (self) {
+                    .ax, .cx, .dx, .bx, .sp, .bp, .si, .di => @enumFromInt(@intFromEnum(self) + @intFromEnum(@as(Register, .eax))),
+                    .eax, .ecx, .edx, .ebx, .esp, .ebp, .esi, .edi => self,
+                    .rax, .rcx, .rdx, .rbx, .rsp, .rbp, .rsi, .rdi => @enumFromInt(@intFromEnum(self) - @intFromEnum(@as(Register, .eax))),
+                    else => unreachable,
+                },
+                8 => switch (self) {
+                    .ax, .cx, .dx, .bx, .sp, .bp, .si, .di => @enumFromInt(@intFromEnum(self) + @intFromEnum(@as(Register, .rax))),
+                    .eax, .ecx, .edx, .ebx, .esp, .ebp, .esi, .edi => @enumFromInt(@intFromEnum(self) + @intFromEnum(@as(Register, .eax))),
+                    .rax, .rcx, .rdx, .rbx, .rsp, .rbp, .rsi, .rdi => self,
+                    else => unreachable,
+                },
+                else => unreachable, // bit_size either not 2, 4 or 8
+            };
+        }
+
+        test withBitSize {
+            try std.testing.expectEqual(.ax, withBitSize(Register.ax, 2));
+            try std.testing.expectEqual(.ax, withBitSize(Register.rax, 2));
+            try std.testing.expectEqual(.ax, withBitSize(Register.eax, 2));
+            try std.testing.expectEqual(.cx, withBitSize(Register.rcx, 2));
+            try std.testing.expectEqual(.cx, withBitSize(Register.ecx, 2));
+            try std.testing.expectEqual(.r8, withBitSize(Register.r8, 2));
+            try std.testing.expectEqual(.xmm0, withBitSize(Register.xmm0, 2));
+
+            try std.testing.expectEqual(.eax, withBitSize(Register.eax, 4));
+            try std.testing.expectEqual(.eax, withBitSize(Register.rax, 4));
+            try std.testing.expectEqual(.eax, withBitSize(Register.ax, 4));
+            try std.testing.expectEqual(.ecx, withBitSize(Register.cx, 4));
+            try std.testing.expectEqual(.ecx, withBitSize(Register.rcx, 4));
+            try std.testing.expectEqual(.r8, withBitSize(Register.r8, 4));
+            try std.testing.expectEqual(.xmm0, withBitSize(Register.xmm0, 4));
+
+            try std.testing.expectEqual(.rax, withBitSize(Register.rax, 8));
+            try std.testing.expectEqual(.rax, withBitSize(Register.eax, 8));
+            try std.testing.expectEqual(.rax, withBitSize(Register.ax, 8));
+            try std.testing.expectEqual(.rcx, withBitSize(Register.rcx, 8));
+            try std.testing.expectEqual(.rcx, withBitSize(Register.ecx, 8));
+            try std.testing.expectEqual(.r8, withBitSize(Register.r8, 8));
+            try std.testing.expectEqual(.xmm0, withBitSize(Register.xmm0, 8));
+        }
 
         pub inline fn toOperandSize(self: Register) u5 {
             return switch (self) {
@@ -358,7 +410,7 @@ const AssemblyBuilder = struct {
             try insn.emit(writer);
             const slice = buffer.items[last_pos..];
             last_pos = buffer.items.len;
-            if (DEBUG) {
+            if (comptime build_cfg.verbose_asm) {
                 std.debug.print("{x}\n", .{slice});
             }
         }
@@ -374,12 +426,9 @@ pub const DataType = struct {
     size: usize,
     alignment: u29,
     offsets: ?[]const usize = null,
-    fields: ?[]const DataType = null,
     pub fn free(self: DataType, allocator: std.mem.Allocator) void {
         if (self.offsets) |offsets|
             allocator.free(offsets);
-        if (self.fields) |fields|
-            allocator.free(fields);
     }
 };
 
@@ -392,18 +441,27 @@ pub const type_f32 = DataType{ .size = 4, .alignment = 4 };
 pub const type_f64 = DataType{ .size = 8, .alignment = 8 };
 pub const type_pointer = DataType{ .size = 8, .alignment = 8 };
 
+fn alignForward(value: usize, alignment: usize) usize {
+    return (value + (alignment - 1)) & ~(@as(usize, alignment - 1));
+}
+
 pub fn makeStruct(allocator: std.mem.Allocator, fields: []const DataType) !DataType {
     var offset: usize = 0;
-    var alignment: u29 = 0;
+    var alignment: u29 = 1;
     var offsets = try allocator.alloc(usize, fields.len);
     errdefer allocator.free(offsets);
     for (fields, 0..) |field, i| {
-        offsets[i] = offset;
         alignment = @max(alignment, field.alignment);
+        offset = alignForward(offset, field.alignment);
+        offsets[i] = offset;
         offset += field.size;
     }
-    const size: usize = @divFloor(offset + alignment - 1, alignment) * alignment;
-    return DataType{ .size = size, .alignment = alignment, .offsets = offsets, .fields = try allocator.dupe(DataType, fields) };
+    const size = alignForward(offset, alignment);
+    return .{
+        .size = size,
+        .alignment = alignment,
+        .offsets = offsets,
+    };
 }
 
 pub inline fn canFitInArgRegister(size: usize, arg_pos: usize) bool {
@@ -439,10 +497,21 @@ pub fn getArgumentStackSize(args: []const DataType, arg_pos: usize) !usize {
 
 pub const FFICallFn = fn (ptr: *const anyopaque, args: ?[*]const *anyopaque, ?*anyopaque) callconv(.c) void;
 
+fn getRegBitSize(size: usize) u8 {
+    if (size >= 8)
+        return 8;
+    return switch (size) {
+        1...2 => 2,
+        3...4 => 4,
+        5...7 => 8,
+        else => unreachable,
+    };
+}
+
 pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataType, return_type: DataType) ![]align(std.mem.page_size) u8 {
     var code = try AssemblyBuilder.initCapacity(allocator, 64);
     defer code.deinit();
-    defer if (DEBUG) code.print();
+    defer if (comptime build_cfg.verbose_asm) code.print();
 
     const fnPtr: AssemblyBuilder.Register = CalleeSavedRegistery[0];
     const argsPtr: AssemblyBuilder.Register = CalleeSavedRegistery[2];
@@ -492,6 +561,9 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
     }
 
     for (param_types, 0..) |param, pos| {
+        std.debug.assert(param.size > 0); // void params not supported
+
+        const bit_size: u8 = getRegBitSize(param.size);
         const can_fit = canFitInArgRegister(param.size, arg_pos);
 
         if (comptime CallingConvention == .Windows) {
@@ -523,10 +595,10 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
             if (can_fit) {
                 defer arg_pos += 1;
                 // mov <REGISTER>, [rax + <offset>]
-                try code.mov(.load, ArgumentRegistery[arg_pos], .rax, offset);
+                try code.mov(.load, ArgumentRegistery[arg_pos].withBitSize(bit_size), .withBitSize(.rax, bit_size), offset);
             } else {
                 // mov r10, [rax + <offset>]
-                try code.mov(.load, .r10, .rax, offset);
+                try code.mov(.load, .r10, .withBitSize(.rax, bit_size), offset);
                 const write_offset: i32 = @as(i32, @intCast(stack_offset)) + offset;
                 if (write_offset >= allocated_stack)
                     return error.StackOverflow;
@@ -548,7 +620,7 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
     // return value into pointer
     if (return_type.size > 0 and !use_return_address) {
         // mov [<retPtr>], rax
-        try code.mov(.store, retPtr, .rax, 0);
+        try code.mov(.store, retPtr, .withBitSize(.rax, getRegBitSize(return_type.size)), 0);
         if (comptime CallingConvention != .Windows)
             if (return_type.size > 8) {
                 // mov [<retPtr> + 8], rdx
