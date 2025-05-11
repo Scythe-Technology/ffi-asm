@@ -11,4 +11,5 @@
         "LICENSE",
         "README.md",
     },
+    .fingerprint = 0xd2efd6e9592ec086,
 }
