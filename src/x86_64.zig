@@ -401,8 +401,8 @@ const AssemblyBuilder = struct {
         try self.appendInsn(.{ .mov = .{ kind, base, reg, disp } });
     }
 
-    pub fn compile(self: *AssemblyBuilder, allocator: std.mem.Allocator) ![]align(std.mem.page_size) u8 {
-        var buffer = try std.ArrayListAligned(u8, std.mem.page_size).initCapacity(allocator, 128);
+    pub fn compile(self: *AssemblyBuilder, allocator: std.mem.Allocator) ![]align(std.heap.page_size_min) u8 {
+        var buffer = try std.ArrayListAligned(u8, std.heap.page_size_min).initCapacity(allocator, 128);
         errdefer buffer.deinit();
         const writer = buffer.writer();
         var last_pos: usize = 0;
@@ -508,7 +508,7 @@ fn getRegBitSize(size: usize) u8 {
     };
 }
 
-pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataType, return_type: DataType) ![]align(std.mem.page_size) u8 {
+pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataType, return_type: DataType) ![]align(std.heap.page_size_min) u8 {
     var code = try AssemblyBuilder.initCapacity(allocator, 64);
     defer code.deinit();
     defer if (comptime build_cfg.verbose_asm) code.print();
