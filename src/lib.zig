@@ -3,14 +3,14 @@ const builtin = @import("builtin");
 
 const builder = @import("x86_64.zig");
 
-const mmap_u8 = []align(std.mem.page_size) u8;
+const mmap_u8 = []align(std.heap.page_size_min) u8;
 
 pub const ExecutableMemory = struct {
     allocator: std.mem.Allocator,
-    mem: []align(std.mem.page_size) u8,
+    mem: []align(std.heap.page_size_min) u8,
 
     pub fn init(allocator: std.mem.Allocator, size: usize) !ExecutableMemory {
-        const mem = try allocator.alignedAlloc(u8, std.mem.page_size, size);
+        const mem = try allocator.alignedAlloc(u8, std.heap.page_size_min, size);
         return .{
             .allocator = allocator,
             .mem = mem,
