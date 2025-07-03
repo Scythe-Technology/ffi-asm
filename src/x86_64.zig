@@ -15,18 +15,23 @@ pub const CallingConvention = switch (builtin.os.tag) {
 
 const REX = 0x40;
 
-pub const ArgumentRegistery = switch (builtin.os.tag) {
-    .windows => [_]AssemblyBuilder.Register{ .rcx, .rdx, .r8, .r9 },
+pub const ArgumentRegistery = switch (CallingConvention) {
+    .Windows => [_]AssemblyBuilder.Register{ .rcx, .rdx, .r8, .r9 },
     else => [_]AssemblyBuilder.Register{ .rdi, .rsi, .rdx, .rcx, .r8, .r9 },
 };
 
-const CalleeSavedRegistery = switch (builtin.os.tag) {
-    .windows => [_]AssemblyBuilder.Register{ .rbx, .rbp, .rdi, .rsi, .r12, .r13, .r14, .r15 },
+pub const FloatingPointRegistery = switch (CallingConvention) {
+    .Windows => [_]AssemblyBuilder.Register{ .xmm0, .xmm1, .xmm2, .xmm3 },
+    else => [_]AssemblyBuilder.Register{ .xmm0, .xmm1, .xmm2, .xmm3, .xmm4, .xmm5, .xmm6, .xmm7 },
+};
+
+const CalleeSavedRegistery = switch (CallingConvention) {
+    .Windows => [_]AssemblyBuilder.Register{ .rbx, .rbp, .rdi, .rsi, .r12, .r13, .r14, .r15 },
     else => [_]AssemblyBuilder.Register{ .rbx, .rbp, .r12, .r13, .r14, .r15 },
 };
 
-const CallerSavedRegistery = switch (builtin.os.tag) {
-    .windows => [_]AssemblyBuilder.Register{ .rax, .rcx, .rdx, .r8, .r9, .r10, .r11 },
+const CallerSavedRegistery = switch (CallingConvention) {
+    .Windows => [_]AssemblyBuilder.Register{ .rax, .rcx, .rdx, .r8, .r9, .r10, .r11 },
     else => [_]AssemblyBuilder.Register{ .rax, .rdi, .rsi, .rdx, .rcx, .r8, .r9, .r10, .r11 },
 };
 
@@ -223,6 +228,13 @@ const AssemblyBuilder = struct {
         call: Register,
         ret: void,
         mov: struct { MovKind, Register, Register, ?i32 },
+        movss: struct { MovKind, Register, Register, ?i32 },
+        movsd: struct { MovKind, Register, Register, ?i32 },
+        movaps: struct { MovKind, Register, Register, ?i32 },
+        movapd: struct { MovKind, Register, Register, ?i32 },
+        movups: struct { MovKind, Register, Register, ?i32 },
+        movupd: struct { MovKind, Register, Register, ?i32 },
+        movdqu: struct { MovKind, Register, Register, ?i32 },
 
         pub const MovKind = enum { load, store };
 
@@ -301,6 +313,221 @@ const AssemblyBuilder = struct {
             } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
         }
 
+        inline fn emitMovss(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0xF3); // Scalar single-precision
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            switch (kind) {
+                .load => try writer.writeByte(0x10), // mov xmm, r/m32
+                .store => try writer.writeByte(0x11), // mov r/m32, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovsd(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0xF2); // Scalar double-precision
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            switch (kind) {
+                .load => try writer.writeByte(0x10), // mov xmm, r/m64
+                .store => try writer.writeByte(0x11), // mov r/m64, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovaps(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            switch (kind) {
+                .load => try writer.writeByte(0x28), // mov xmm, r/m128
+                .store => try writer.writeByte(0x29), // mov r/m128, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovapd(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0x66); // double-precision
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            switch (kind) {
+                .load => try writer.writeByte(0x28), // mov xmm, r/m128
+                .store => try writer.writeByte(0x29), // mov r/m128, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovups(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            switch (kind) {
+                .load => try writer.writeByte(0x10), // mov xmm, r/m128
+                .store => try writer.writeByte(0x11), // mov r/m128, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovupd(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0x66); // double-precision
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            switch (kind) {
+                .load => try writer.writeByte(0x10), // mov xmm, r/m128
+                .store => try writer.writeByte(0x11), // mov r/m128, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
+        inline fn emitMovdqu(writer: anytype, kind: MovKind, r1: Register, r2: Register, disp: ?i32) !void {
+            const base = if (kind == .load) r1 else r2;
+            const reg = if (kind == .load) r2 else r1;
+            try writer.writeByte(0xF3);
+            const rex = RexRegister(base, reg);
+            if (rex != 0x40)
+                try writer.writeByte(rex);
+            try writer.writeByte(0x0F); // Prefix for SSE2
+            switch (kind) {
+                .load => try writer.writeByte(0x6F), // mov xmm, r/m128
+                .store => try writer.writeByte(0x7F), // mov r/m128, xmm
+            }
+            if (disp) |d| {
+                const mode: Mod = if (d > std.math.maxInt(i8) or d < std.math.minInt(i8))
+                    .disp32
+                else if (d != 0 or reg == .r13 or reg == .rbp)
+                    .disp8
+                else
+                    .access;
+                try writer.writeByte(ModRM(mode, base.toInt(), reg.toInt()));
+                if (reg.isSIB())
+                    try writer.writeByte(SIB(0x00, 0x04, reg.toInt()));
+                switch (mode) {
+                    .disp32 => try writer.writeAll(&@as([4]u8, @bitCast(d))),
+                    .disp8 => try writer.writeByte(@bitCast(@as(i8, @truncate(d)))),
+                    .access => {},
+                    .direct => unreachable,
+                }
+            } else try writer.writeByte(ModRM(.direct, base.toInt(), reg.toInt()));
+        }
+
         pub fn emit(self: Instruction, writer: anytype) !void {
             return switch (self) {
                 .push => |insn| emitPush(writer, insn),
@@ -309,6 +536,13 @@ const AssemblyBuilder = struct {
                 .call => |insn| emitCall(writer, insn),
                 .ret => emitRet(writer),
                 .mov => |insn| emitMov(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movss => |insn| emitMovss(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movsd => |insn| emitMovsd(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movaps => |insn| emitMovaps(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movapd => |insn| emitMovapd(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movups => |insn| emitMovups(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movupd => |insn| emitMovupd(writer, insn[0], insn[1], insn[2], insn[3]),
+                .movdqu => |insn| emitMovdqu(writer, insn[0], insn[1], insn[2], insn[3]),
             };
         }
 
@@ -317,18 +551,18 @@ const AssemblyBuilder = struct {
                 .push, .pop, .call => |insn| std.debug.print("{s}: {s}\n", .{ @tagName(self), @tagName(insn) }),
                 .imm => |insn| std.debug.print("imm: {s}, {s} {d}\n", .{ @tagName(insn[0]), @tagName(insn[1]), insn[2] }),
                 .ret => std.debug.print("ret\n", .{}),
-                .mov => |insn| switch (insn[0]) {
+                .mov, .movss, .movsd, .movapd, .movaps, .movupd, .movups, .movdqu => |insn| switch (insn[0]) {
                     .store => {
                         if (insn[3]) |d|
-                            std.debug.print("mov: [{s} + {d}], {s}\n", .{ @tagName(insn[2]), d, @tagName(insn[1]) })
+                            std.debug.print("{s}: [{s} + {d}], {s}\n", .{ @tagName(self), @tagName(insn[1]), d, @tagName(insn[2]) })
                         else
-                            std.debug.print("mov: {s}, {s}\n", .{ @tagName(insn[1]), @tagName(insn[2]) });
+                            std.debug.print("{s}: {s}, {s}\n", .{ @tagName(self), @tagName(insn[1]), @tagName(insn[2]) });
                     },
                     .load => {
                         if (insn[3]) |d|
-                            std.debug.print("mov: {s}, [{s} + {d}]\n", .{ @tagName(insn[1]), @tagName(insn[2]), d })
+                            std.debug.print("{s}: {s}, [{s} + {d}]\n", .{ @tagName(self), @tagName(insn[1]), @tagName(insn[2]), d })
                         else
-                            std.debug.print("mov: {s}, {s}\n", .{ @tagName(insn[1]), @tagName(insn[2]) });
+                            std.debug.print("{s}: {s}, {s}\n", .{ @tagName(self), @tagName(insn[1]), @tagName(insn[2]) });
                     },
                 },
             };
@@ -361,6 +595,34 @@ const AssemblyBuilder = struct {
         try self.appendInsn(.{ .mov = .{ kind, base, reg, disp } });
     }
 
+    pub fn movss(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movss = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movsd(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movsd = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movaps(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movaps = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movapd(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movapd = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movups(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movups = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movupd(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movupd = .{ kind, base, reg, disp } });
+    }
+
+    pub fn movdqu(self: *AssemblyBuilder, kind: Instruction.MovKind, base: Register, reg: Register, disp: ?i32) !void {
+        try self.appendInsn(.{ .movdqu = .{ kind, base, reg, disp } });
+    }
+
     pub fn compile(self: *AssemblyBuilder, allocator: std.mem.Allocator) ![]align(std.heap.page_size_min) u8 {
         var buffer = try std.ArrayListAligned(u8, std.heap.page_size_min).initCapacity(allocator, 128);
         errdefer buffer.deinit();
@@ -386,60 +648,92 @@ pub const DataType = struct {
     size: usize,
     alignment: u29,
     offsets: ?[]const usize = null,
+    class: Class = .int,
+
+    pub const Class = enum { sse, int, mem };
+
     pub fn free(self: DataType, allocator: std.mem.Allocator) void {
         if (self.offsets) |offsets|
             allocator.free(offsets);
     }
 };
 
-pub const type_void = DataType{ .size = 0, .alignment = 0 };
-pub const type_i8 = DataType{ .size = 1, .alignment = 1 };
-pub const type_i16 = DataType{ .size = 2, .alignment = 2 };
-pub const type_i32 = DataType{ .size = 4, .alignment = 4 };
-pub const type_i64 = DataType{ .size = 8, .alignment = 8 };
-pub const type_f32 = DataType{ .size = 4, .alignment = 4 };
-pub const type_f64 = DataType{ .size = 8, .alignment = 8 };
-pub const type_pointer = DataType{ .size = 8, .alignment = 8 };
-
 fn alignForward(value: usize, alignment: usize) usize {
     return (value + (alignment - 1)) & ~(@as(usize, alignment - 1));
 }
 
-pub fn makeStruct(allocator: std.mem.Allocator, fields: []const DataType) !DataType {
+pub fn createStruct(allocator: std.mem.Allocator, fields: []const DataType, force_alignment: ?u29) !DataType {
+    if (fields.len == 0)
+        return DataType{ .size = 0, .alignment = 0 };
     var offset: usize = 0;
     var alignment: u29 = 1;
     var offsets = try allocator.alloc(usize, fields.len);
     errdefer allocator.free(offsets);
+    var class = fields[0].class;
     for (fields, 0..) |field, i| {
         alignment = @max(alignment, field.alignment);
         offset = alignForward(offset, field.alignment);
         offsets[i] = offset;
         offset += field.size;
+        if (class != field.class)
+            class = .int;
     }
-    const size = alignForward(offset, alignment);
+    if (force_alignment orelse alignment < alignment)
+        return error.PoorAlignment;
+    const size = alignForward(offset, force_alignment orelse alignment);
+    if (size > if (comptime CallingConvention == .Windows) 8 else 16) {
+        class = .mem;
+    } else if (comptime CallingConvention == .Windows)
+        class = .int; // Windows ABI does not use SSE for structs
     return .{
         .size = size,
-        .alignment = alignment,
+        .alignment = force_alignment orelse alignment,
         .offsets = offsets,
+        .class = class,
     };
 }
 
-pub inline fn canFitInArgRegister(size: usize, arg_pos: usize) bool {
+pub const type_void = DataType{ .size = 0, .alignment = 0 };
+pub const type_i8 = DataType{ .size = 1, .alignment = 1 };
+pub const type_i16 = DataType{ .size = 2, .alignment = 2 };
+pub const type_i32 = DataType{ .size = 4, .alignment = 4 };
+pub const type_i64 = DataType{ .size = 8, .alignment = 8 };
+pub const type_f32 = DataType{ .size = 4, .alignment = 4, .class = .sse };
+pub const type_f64 = DataType{ .size = 8, .alignment = 8, .class = .sse };
+pub const type_pointer = DataType{ .size = 8, .alignment = 8 };
+
+pub inline fn canFitInArgRegister(class: DataType.Class, size: usize, arg_pos: usize) bool {
     if (comptime CallingConvention == .Windows)
         // Large size data passed by reference
-        return arg_pos < ArgumentRegistery.len
+        return arg_pos < switch (class) {
+            .sse => FloatingPointRegistery.len,
+            else => ArgumentRegistery.len,
+        }
     else
-        return size <= 16 and arg_pos + @divFloor(size, 8) <= ArgumentRegistery.len;
+        return size <= 16 and arg_pos + @divFloor(size, 8) <= switch (class) {
+            .sse => FloatingPointRegistery.len,
+            else => ArgumentRegistery.len,
+        };
 }
 
 pub fn getArgumentStackSize(args: []const DataType, arg_pos: usize) !usize {
     var pos: usize = arg_pos;
+    var float_pos: usize = 0;
     var stack: usize = 0;
     for (args) |arg| {
-        defer pos += 1;
-        if (canFitInArgRegister(arg.size, pos) and stack == 0) {
+        const class = if (comptime CallingConvention == .Windows) .int else arg.class;
+        const p = switch (class) {
+            .sse => blk: {
+                defer float_pos += 1;
+                break :blk float_pos;
+            },
+            else => blk: {
+                defer pos += 1;
+                break :blk pos;
+            },
+        };
+        if (canFitInArgRegister(class, arg.size, p) and stack == 0) {
             if (comptime CallingConvention != .Windows) {
-                // Large size data passed by reference
                 if (arg.size > 8)
                     pos += try std.math.divCeil(usize, arg.size, 8) - 1;
             }
@@ -480,6 +774,7 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
     const use_return_address = return_type.size > (if (comptime CallingConvention == .Windows) 8 else 16);
 
     var arg_pos: usize = 0;
+    var floating_arg_pos: usize = 0;
     var stack_offset: u32 = 0;
 
     // push all registers to the stack
@@ -491,20 +786,16 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
     if (return_type.size > 0 and !use_return_address)
         try code.push(retPtr);
 
-    // mov <fnPtr>, <arg_1>
-    try code.mov(.store, fnPtr, ArgumentRegistery[0], null);
+    try code.mov(.store, fnPtr, ArgumentRegistery[0], null); // mov <fnPtr>, <arg_1>
     if (param_types.len > 0) {
-        // mov <paramsPtr>, <arg_2>
-        try code.mov(.store, argsPtr, ArgumentRegistery[1], null);
+        try code.mov(.store, argsPtr, ArgumentRegistery[1], null); // mov <paramsPtr>, <arg_2>
     }
     if (return_type.size > 0) {
         if (use_return_address) {
             arg_pos += 1;
-            // mov <arg_1>, <arg_3>
-            try code.mov(.store, ArgumentRegistery[0], ArgumentRegistery[2], null);
+            try code.mov(.store, ArgumentRegistery[0], ArgumentRegistery[2], null); // mov <arg_1>, <arg_3>
         } else {
-            // mov <returnPtr>, <arg_3>
-            try code.mov(.store, retPtr, ArgumentRegistery[2], null);
+            try code.mov(.store, retPtr, ArgumentRegistery[2], null); // mov <returnPtr>, <arg_3>
         }
     }
 
@@ -516,35 +807,35 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
 
     if (allocated_stack > 0) {
         // allocate args + align the stack
-        // sub rsp, <padding>
-        try code.imm(.sub, .rsp, @truncate(allocated_stack));
+        try code.imm(.sub, .rsp, @truncate(allocated_stack)); // sub rsp, <padding>
     }
 
     for (param_types, 0..) |param, pos| {
         std.debug.assert(param.size > 0); // void params not supported
 
         const bit_size: u8 = getRegBitSize(param.size);
-        const can_fit = canFitInArgRegister(param.size, arg_pos);
 
-        if (comptime CallingConvention == .Windows) {
-            if (param.size > 8) {
-                if (can_fit) {
-                    defer arg_pos += 1;
-                    // mov <REGISTER>, [<arg_list_reg> + <pos>]
-                    try code.mov(.load, ArgumentRegistery[arg_pos], argsPtr, @truncate(@as(isize, @intCast(pos * 8))));
-                } else {
-                    defer stack_offset += 8;
-                    // mov rax, [<arg_list_reg> + <pos>]
-                    try code.mov(.load, .rax, argsPtr, @truncate(@as(isize, @intCast(pos * 8))));
-                    // mov [rsp + <offset>], rax
-                    try code.mov(.store, .rsp, .rax, @intCast(stack_offset));
-                }
-                continue;
+        if (comptime CallingConvention == .Windows) if (param.size > 8) {
+            if (canFitInArgRegister(param.class, param.size, arg_pos)) {
+                defer arg_pos += 1;
+                try code.mov(.load, ArgumentRegistery[arg_pos], argsPtr, @truncate(@as(isize, @intCast(pos * 8)))); // mov <REGISTER>, [<arg_list_reg> + <pos>]
+            } else {
+                defer stack_offset += 8;
+                try code.mov(.load, .rax, argsPtr, @truncate(@as(isize, @intCast(pos * 8)))); // mov rax, [<arg_list_reg> + <pos>]
+                const write_offset: i32 = @intCast(stack_offset);
+                if (write_offset >= allocated_stack)
+                    return error.StackOverflow;
+                try code.mov(.store, .rsp, .rax, write_offset); // mov [rsp + <offset>], rax
             }
-        }
+            continue;
+        } else std.debug.assert(param.size <= 8);
 
-        // mov rax, [<arg_list_reg> + <pos>]
-        try code.mov(.load, .rax, argsPtr, @truncate(@as(isize, @intCast(pos * 8))));
+        const can_fit = canFitInArgRegister(param.class, param.size, if (comptime CallingConvention == .Windows) arg_pos else switch (param.class) {
+            .sse => floating_arg_pos,
+            else => arg_pos,
+        });
+
+        try code.mov(.load, .rax, argsPtr, @truncate(@as(isize, @intCast(pos * 8)))); // mov rax, [<arg_list_reg> + <pos>]
 
         const fill = try std.math.divCeil(usize, param.size, 8);
         defer if (!can_fit) {
@@ -552,51 +843,82 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
         };
         for (0..fill) |i| {
             const offset: i32 = @intCast(i * 8); // Offset within the argument
-            if (can_fit) {
-                defer arg_pos += 1;
-                // mov <REGISTER>, [rax + <offset>]
-                try code.mov(.load, ArgumentRegistery[arg_pos].withBitSize(bit_size), .withBitSize(.rax, bit_size), offset);
-            } else {
-                // mov r10, [rax + <offset>]
-                try code.mov(.load, .r10, .withBitSize(.rax, bit_size), offset);
-                const write_offset: i32 = @as(i32, @intCast(stack_offset)) + offset;
-                if (write_offset >= allocated_stack)
-                    return error.StackOverflow;
-                // mov [rsp + <offset>], r10
-                try code.mov(.store, .rsp, .r10, write_offset);
+            work: switch (param.class) {
+                .int => {
+                    if (!can_fit)
+                        continue :work .mem;
+                    defer arg_pos += 1;
+                    try code.mov(.load, ArgumentRegistery[arg_pos].withBitSize(bit_size), .withBitSize(.rax, bit_size), offset); // mov <REGISTER>, [rax + <offset>]
+                },
+                .sse => {
+                    if (!can_fit)
+                        continue :work .mem;
+                    if (comptime CallingConvention == .Windows) {
+                        defer arg_pos += 1;
+                        switch (param.size) {
+                            4 => try code.movss(.load, FloatingPointRegistery[arg_pos], .withBitSize(.rax, bit_size), offset), // movss xmm, [rax + <offset>]
+                            8 => try code.movsd(.load, FloatingPointRegistery[arg_pos], .withBitSize(.rax, bit_size), offset), // movsd xmm, [rax + <offset>]
+                            else => unreachable, // should not happen
+                        }
+                        break;
+                    } else {
+                        defer floating_arg_pos += 1;
+                        switch (param.size) {
+                            4 => try code.movss(.load, FloatingPointRegistery[floating_arg_pos], .withBitSize(.rax, bit_size), offset), // movss xmm, [rax + <offset>]
+                            else => try code.movsd(.load, FloatingPointRegistery[floating_arg_pos], .withBitSize(.rax, bit_size), offset), // movsd xmm, [rax + <offset>]
+                        }
+                    }
+                },
+                .mem => {
+                    try code.mov(.load, .r10, .withBitSize(.rax, bit_size), offset); // mov r10, [rax + <offset>]
+                    const write_offset: i32 = @as(i32, @intCast(stack_offset)) + offset;
+                    if (write_offset >= allocated_stack)
+                        return error.StackOverflow;
+                    try code.mov(.store, .rsp, .r10, write_offset); // mov [rsp + <offset>], r10
+                },
             }
         }
     }
 
-    if (comptime CallingConvention == .Windows) {
-        // sub rsp, 32
-        try code.imm(.sub, .rsp, 32);
-    }
+    if (comptime CallingConvention == .Windows)
+        try code.imm(.sub, .rsp, 32); // sub rsp, 32
 
     // call function
-    // call <fnPtr>
-    try code.call(fnPtr);
+    try code.call(fnPtr); // call <fnPtr>
 
     // return value into pointer
     if (return_type.size > 0 and !use_return_address) {
-        // mov [<retPtr>], rax
-        try code.mov(.store, retPtr, .withBitSize(.rax, getRegBitSize(return_type.size)), 0);
-        if (comptime CallingConvention != .Windows)
-            if (return_type.size > 8) {
-                // mov [<retPtr> + 8], rdx
-                try code.mov(.store, retPtr, .rdx, 0x8);
-            };
+        switch (return_type.class) {
+            .sse => {
+                if (comptime CallingConvention == .Windows) switch (return_type.size) {
+                    4 => try code.movss(.store, retPtr, .xmm0, 0), // movss [<retPtr>], xmm0
+                    8 => try code.movsd(.store, retPtr, .xmm0, 0), // movsd [<retPtr>], xmm0
+                    else => return error.InvalidReturnType,
+                } else {
+                    switch (return_type.size) {
+                        4 => try code.movss(.store, retPtr, .xmm0, 0), // movss [<retPtr>], xmm0
+                        else => try code.movsd(.store, retPtr, .xmm0, 0), // movsd [<retPtr>], xmm0
+                    }
+                    if (return_type.size > 8)
+                        try code.movsd(.store, retPtr, .xmm1, 0x8); // movsd [<retPtr> + 8], xmm1
+                }
+            },
+            else => {
+                try code.mov(.store, retPtr, .withBitSize(.rax, getRegBitSize(return_type.size)), 0); // mov [<retPtr>], rax
+                if (comptime CallingConvention != .Windows)
+                    if (return_type.size > 8) {
+                        try code.mov(.store, retPtr, .rdx, 0x8); // mov [<retPtr> + 8], rdx
+                    };
+            },
+        }
     }
 
-    if (comptime CallingConvention == .Windows) {
-        // add rsp, 32
-        try code.imm(.add, .rsp, 32);
-    }
+    if (comptime CallingConvention == .Windows)
+        try code.imm(.add, .rsp, 32); // add rsp, 32
 
     if (allocated_stack > 0) {
         // restore stack pointer
-        // add rsp, <args_size + padding>
-        try code.imm(.add, .rsp, @truncate(allocated_stack));
+        try code.imm(.add, .rsp, @truncate(allocated_stack)); // add rsp, <args_size + padding>
     }
 
     // pop all registers, restoring registers
@@ -608,7 +930,6 @@ pub fn generateAsmCall(allocator: std.mem.Allocator, param_types: []const DataTy
     }
     try code.pop(fnPtr);
 
-    // ret
     try code.ret();
 
     return try code.compile(allocator);
