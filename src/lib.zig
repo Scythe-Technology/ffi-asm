@@ -155,7 +155,7 @@ test "Add (i8, i8) i8" {
     const result = add(5, 7);
     try testing.expectEqual(12, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i8, builder.type_i8 }, builder.type_i8);
+    const mem = try generateAsmCall(allocator, &.{ type_i8, type_i8 }, type_i8);
     const dynm = ExecutableMemory{
         .allocator = allocator,
         .mem = mem,
@@ -164,7 +164,7 @@ test "Add (i8, i8) i8" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i8 = 5;
     var b: i8 = 7;
@@ -191,7 +191,7 @@ test "Add (i8, i8)  C" {
     const result = add(5, 7);
     try testing.expectEqual(12, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i8, builder.type_i8 }, builder.type_i8);
+    const mem = try generateAsmCall(allocator, &.{ type_i8, type_i8 }, type_i8);
     const dynm = ExecutableMemory{
         .allocator = allocator,
         .mem = mem,
@@ -200,7 +200,7 @@ test "Add (i8, i8)  C" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     {
         var a: i8 = 5;
@@ -215,7 +215,7 @@ test "Add (i8, i8)  C" {
     }
 
     const c_test = struct {
-        fn inner(callable: *const builder.FFICallFn) callconv(.c) void {
+        fn inner(callable: *const CallFn) callconv(.c) void {
             var a: i8 = 5;
             var b: i8 = 7;
             var res: i8 = 0;
@@ -245,7 +245,7 @@ test "Add (i16, i16) i16" {
     const result = add(5, 7);
     try testing.expectEqual(12, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i16, builder.type_i16 }, builder.type_i16);
+    const mem = try generateAsmCall(allocator, &.{ type_i16, type_i16 }, type_i16);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -253,7 +253,7 @@ test "Add (i16, i16) i16" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i16 = 5;
     var b: i16 = 7;
@@ -280,7 +280,7 @@ test "Add (i32, i32) i32" {
     const result = add(5, 7);
     try testing.expectEqual(12, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i32, builder.type_i32 }, builder.type_i32);
+    const mem = try generateAsmCall(allocator, &.{ type_i32, type_i32 }, type_i32);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -288,7 +288,7 @@ test "Add (i32, i32) i32" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i32 = 5;
     var b: i32 = 7;
@@ -315,7 +315,7 @@ test "Add (i64, i64) i64" {
     const result = add(5, 7);
     try testing.expectEqual(12, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i64, builder.type_i64 }, builder.type_i64);
+    const mem = try generateAsmCall(allocator, &.{ type_i64, type_i64 }, type_i64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -323,7 +323,7 @@ test "Add (i64, i64) i64" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i64 = 5;
     var b: i64 = 7;
@@ -358,13 +358,13 @@ test "Add (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) i64" {
     const result = add(5, 7, 9, 11, 13, 15, 17, 19, 21, 23);
     try testing.expectEqual(140, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-    }, builder.type_i64);
+    const mem = try generateAsmCall(allocator, &.{
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+    }, type_i64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -372,7 +372,7 @@ test "Add (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) i64" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i64 = 5;
     var b: i64 = 7;
@@ -417,7 +417,7 @@ test "Add (i8, i16, i32, i64) i64" {
     const result = add(5, 7, 9, 11);
     try testing.expectEqual(32, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i8, builder.type_i16, builder.type_i32, builder.type_i64 }, builder.type_i64);
+    const mem = try generateAsmCall(allocator, &.{ type_i8, type_i16, type_i32, type_i64 }, type_i64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -425,7 +425,7 @@ test "Add (i8, i16, i32, i64) i64" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i8 = 5;
     var b: i16 = 7;
@@ -455,15 +455,15 @@ test "Test (struct(4)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i32,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i32,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -471,7 +471,7 @@ test "Test (struct(4)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5 };
 
@@ -495,17 +495,17 @@ test "Test (struct(8)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -513,7 +513,7 @@ test "Test (struct(8)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5, .b = 7, .c = 9 };
 
@@ -539,18 +539,18 @@ test "Test (struct(16)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -558,7 +558,7 @@ test "Test (struct(16)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5, .b = 7, .c = 9, .d = 11 };
 
@@ -584,18 +584,18 @@ test "Test (struct(32)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i64,
+        type_i64,
+        type_i64,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -603,7 +603,7 @@ test "Test (struct(32)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5, .b = 7, .c = 9, .d = 11 };
 
@@ -637,18 +637,18 @@ test "Test (struct(64)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -656,7 +656,7 @@ test "Test (struct(64)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5, .b = 7, .c = 9, .d = 11, .e = 13, .f = 15, .g = 17, .h = 19 };
 
@@ -693,18 +693,18 @@ test "Test (struct(64), i64) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ sample_struct, builder.type_i64 }, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{ sample_struct, type_i64 }, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -712,7 +712,7 @@ test "Test (struct(64), i64) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 5, .b = 7, .c = 9, .d = 11, .e = 13, .f = 15, .g = 17, .h = 19 };
     var b: i64 = 21;
@@ -761,11 +761,11 @@ test "Test (i64, ...half, struct(16)) void" {
         }.inner,
     };
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
@@ -773,8 +773,8 @@ test "Test (i64, ...half, struct(16)) void" {
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
     const mem = switch (builder.CallingConvention) {
-        .SystemV => try builder.generateAsmCall(allocator, &.{ builder.type_i64, builder.type_i64, builder.type_i64, builder.type_i64, builder.type_i64, sample_struct }, builder.type_void),
-        .Windows => try builder.generateAsmCall(allocator, &.{ builder.type_i64, builder.type_i64, builder.type_i64, sample_struct }, builder.type_void),
+        .SystemV => try generateAsmCall(allocator, &.{ type_i64, type_i64, type_i64, type_i64, type_i64, sample_struct }, type_void),
+        .Windows => try generateAsmCall(allocator, &.{ type_i64, type_i64, type_i64, sample_struct }, type_void),
     };
     defer allocator.free(mem);
 
@@ -785,7 +785,7 @@ test "Test (i64, ...half, struct(16)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     switch (builder.CallingConvention) {
         .SystemV => {
@@ -838,24 +838,24 @@ test "Test (i64, i64, i64, i64, i64, i64, i64, i64, i64, struct(16)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, builder.type_i64,
-        builder.type_i64, sample_struct,
-    }, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, type_i64,
+        type_i64, sample_struct,
+    }, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -863,7 +863,7 @@ test "Test (i64, i64, i64, i64, i64, i64, i64, i64, i64, struct(16)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i64 = 0;
     var b: i64 = 0;
@@ -899,18 +899,18 @@ test "Test (i8, i16, i32, i64) struct(16)" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i8, builder.type_i16, builder.type_i32, builder.type_i64 }, sample_struct);
+    const mem = try generateAsmCall(allocator, &.{ type_i8, type_i16, type_i32, type_i64 }, sample_struct);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -918,7 +918,7 @@ test "Test (i8, i16, i32, i64) struct(16)" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i8 = 5;
     var b: i16 = 7;
@@ -964,24 +964,24 @@ test "Test (i8, i16, i32, i64) struct(64)" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_i8,
-        builder.type_i16,
-        builder.type_i32,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
-        builder.type_i64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_i8,
+        type_i16,
+        type_i32,
+        type_i64,
+        type_i64,
+        type_i64,
+        type_i64,
+        type_i64,
+        type_i64,
+        type_i64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_i8, builder.type_i16, builder.type_i32, builder.type_i64 }, sample_struct);
+    const mem = try generateAsmCall(allocator, &.{ type_i8, type_i16, type_i32, type_i64 }, sample_struct);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -989,7 +989,7 @@ test "Test (i8, i16, i32, i64) struct(64)" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: i8 = 5;
     var b: i16 = 7;
@@ -1029,7 +1029,7 @@ test "Add (f32, f32) f32" {
     const result = add(1.5, 2.5);
     try testing.expectEqual(4, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_f32, builder.type_f32 }, builder.type_f32);
+    const mem = try generateAsmCall(allocator, &.{ type_f32, type_f32 }, type_f32);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1037,7 +1037,7 @@ test "Add (f32, f32) f32" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: f32 = 1.5;
     var b: f32 = 2.5;
@@ -1064,7 +1064,7 @@ test "Add (f64, f64) f64" {
     const result = add(1.5, 2.5);
     try testing.expectEqual(4, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_f64, builder.type_f64 }, builder.type_f64);
+    const mem = try generateAsmCall(allocator, &.{ type_f64, type_f64 }, type_f64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1072,7 +1072,7 @@ test "Add (f64, f64) f64" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: f64 = 1.5;
     var b: f64 = 2.5;
@@ -1107,7 +1107,7 @@ test "Add (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) f64" {
     const result = add(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5);
     try testing.expectEqual(60, result);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64 }, builder.type_f64);
+    const mem = try generateAsmCall(allocator, &.{ type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64 }, type_f64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1115,7 +1115,7 @@ test "Add (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64) f64" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: f64 = 1.5;
     var b: f64 = 2.5;
@@ -1173,13 +1173,13 @@ test "Add (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, struct(f64, f64)) f
     const result = add(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, .{ .a = 11.5, .b = 12.5 });
     try testing.expectEqual(84, result);
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_f64,
-        builder.type_f64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_f64,
+        type_f64,
     }, null);
     defer sample_struct.free(allocator);
 
-    const mem = try builder.generateAsmCall(allocator, &.{ builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, builder.type_f64, sample_struct }, builder.type_f64);
+    const mem = try generateAsmCall(allocator, &.{ type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, type_f64, sample_struct }, type_f64);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1187,7 +1187,7 @@ test "Add (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, struct(f64, f64)) f
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: f64 = 1.5;
     var b: f64 = 2.5;
@@ -1234,16 +1234,16 @@ test "Test (struct(f64, f64)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_f64,
-        builder.type_f64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_f64,
+        type_f64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1251,7 +1251,7 @@ test "Test (struct(f64, f64)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 1.2345, .b = 6.789 };
 
@@ -1273,16 +1273,16 @@ test "Test (struct(f32, f64)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_f32,
-        builder.type_f64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_f32,
+        type_f64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1290,7 +1290,7 @@ test "Test (struct(f32, f64)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 1.2345, .b = 6.789 };
 
@@ -1314,17 +1314,17 @@ test "Test (struct(f32, f32, f64)) void" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_f32,
-        builder.type_f32,
-        builder.type_f64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_f32,
+        type_f32,
+        type_f64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{sample_struct}, builder.type_void);
+    const mem = try generateAsmCall(allocator, &.{sample_struct}, type_void);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1332,7 +1332,7 @@ test "Test (struct(f32, f32, f64)) void" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var a: sample = .{ .a = 1.2345, .b = 6.789, .c = 12.3456789 };
 
@@ -1353,16 +1353,16 @@ test "Test (void) struct(f64, f64)" {
         }
     }.inner;
 
-    const sample_struct = try builder.createStruct(allocator, &.{
-        builder.type_f64,
-        builder.type_f64,
+    const sample_struct = try createStruct(allocator, &.{
+        type_f64,
+        type_f64,
     }, null);
     defer sample_struct.free(allocator);
 
     try testing.expectEqual(@sizeOf(sample), sample_struct.size);
     try testing.expectEqual(@alignOf(sample), sample_struct.alignment);
 
-    const mem = try builder.generateAsmCall(allocator, &.{}, sample_struct);
+    const mem = try generateAsmCall(allocator, &.{}, sample_struct);
     defer allocator.free(mem);
 
     const dynm = try ExecutableMemory.initWithBytes(allocator, mem);
@@ -1370,7 +1370,7 @@ test "Test (void) struct(f64, f64)" {
 
     try dynm.executable();
 
-    const call_fn_ffi: *const builder.FFICallFn = @ptrCast(dynm.mem);
+    const call_fn_ffi: *const CallFn = @ptrCast(dynm.mem);
 
     var ret: sample = undefined;
 
