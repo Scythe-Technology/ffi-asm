@@ -5,6 +5,20 @@ const builder = @import("x86_64.zig");
 
 const mmap_u8 = []align(std.heap.page_size_min) u8;
 
+pub const CallFn = builder.CallFn;
+pub const DataType = builder.DataType;
+pub const createStruct = builder.createStruct;
+pub const generateAsmCall = builder.generateAsmCall;
+
+pub const type_i8 = builder.type_i8;
+pub const type_i16 = builder.type_i16;
+pub const type_i32 = builder.type_i32;
+pub const type_i64 = builder.type_i64;
+pub const type_void = builder.type_void;
+pub const type_f32 = builder.type_f32;
+pub const type_f64 = builder.type_f64;
+pub const type_ptr = builder.type_ptr;
+
 pub const ExecutableMemory = struct {
     allocator: std.mem.Allocator,
     mem: []align(std.heap.page_size_min) u8,

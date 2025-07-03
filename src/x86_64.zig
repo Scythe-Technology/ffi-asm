@@ -749,7 +749,7 @@ pub fn getArgumentStackSize(args: []const DataType, arg_pos: usize) !usize {
     return stack;
 }
 
-pub const FFICallFn = fn (ptr: *const anyopaque, args: ?[*]const *anyopaque, ?*anyopaque) callconv(.c) void;
+pub const CallFn = fn (ptr: *const anyopaque, args: ?[*]const *anyopaque, ?*anyopaque) callconv(.c) void;
 
 fn getRegBitSize(size: usize) u8 {
     if (size >= 8)
